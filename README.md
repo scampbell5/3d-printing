@@ -2,6 +2,10 @@
 
 A collection of printable designs, CAD source, print settings, and physical test notes.
 
+[![CAD preview: Gridfinity reciprocating saw blade holder with a removable sliding cover](designs/gridfinity/reciprocating-saw-blade-holder/images/hero-exploded.png)](designs/gridfinity/reciprocating-saw-blade-holder/README.md)
+
+*Featured prototype: [Gridfinity reciprocating saw blade holder with sliding lid](designs/gridfinity/reciprocating-saw-blade-holder/README.md). Rendered from the actual V4 STL meshes; physical print validation pending.*
+
 ## Designs
 
 | Project | Category | Status | License |
@@ -18,7 +22,7 @@ A collection of printable designs, CAD source, print settings, and physical test
 │   │       ├── cad/            # Build source and derived inputs
 │   │       ├── stl/            # Latest print-ready candidates
 │   │       ├── slicer/         # Saved slicer projects, once available
-│   │       ├── images/         # Print photos and renders, once available
+│   │       ├── images/         # STL preview renders and future print photos
 │   │       ├── references/     # Original design and attribution
 │   │       ├── scripts/        # Mesh verification
 │   │       ├── ATTRIBUTION.md
