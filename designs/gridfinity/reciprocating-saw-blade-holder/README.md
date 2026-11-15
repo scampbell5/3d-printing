@@ -2,6 +2,22 @@
 
 **Status: prototype; first physical print underway.** This project is a noncommercial remix of [oly's Gridfinity Reciprocating Saw (AKA Sawzall) Blade Storage Bin](https://www.printables.com/model/358300-gridfinity-reciprocating-saw-aka-sawzall-blade-sto). See [ATTRIBUTION.md](ATTRIBUTION.md) and [LICENSE.md](LICENSE.md) before redistributing.
 
+## CAD preview gallery
+
+![Exploded CAD preview of the V4 Gridfinity saw blade holder and its sliding cover](images/hero-exploded.png)
+
+*Exploded view showing the V4 holder and separate sleeve cover. Colors are illustrative; these are renders of the actual STL meshes, not photos of a completed print.*
+
+| Cover installed | Blade compartments |
+|---|---|
+| ![V4 holder with the sliding lid in its closed position](images/closed-lid.png) | ![V4 open holder showing three long compartments for reciprocating saw blades](images/holder-open.png) |
+
+| Six chamfered feet | Print orientations |
+|---|---|
+| ![Underside showing six shallow Gridfinity-style feet](images/gridfinity-feet.png) | ![Top-down preview: holder upright and lid rotated face-down for printing](images/print-orientation.png) |
+
+These previews document mesh geometry only. **They do not confirm physical fit, lock performance, or support-free slicing.** You can reproduce them with [`scripts/render_previews.py`](scripts/render_previews.py); see [`images/README.md`](images/README.md).
+
 ## Design overview
 
 - Approx. 1 × 6 Gridfinity footprint, with three longitudinal blade compartments.
