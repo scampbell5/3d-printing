@@ -1,0 +1,38 @@
+name: Design proposal
+description: Suggest a new printable model or an improvement to an existing one
+title: '[Design] '
+labels: []
+body:
+  - type: textarea
+    id: goal
+    attributes:
+      label: What should this design do?
+      description: Describe the use case and the problem it solves.
+      placeholder: A printable holder that...
+    validations:
+      required: true
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Important constraints
+      description: Size, printer, material, fit, assembly, mounting, or tolerance requirements.
+    validations:
+      required: false
+  - type: textarea
+    id: source
+    attributes:
+      label: Source or remix licensing
+      description: If based on someone else's design, link the source, identify the creator, and provide its exact license.
+    validations:
+      required: false
+  - type: dropdown
+    id: status
+    attributes:
+      label: Current development state
+      options:
+        - Idea only
+        - CAD work in progress
+        - STL available, not printed
+        - Test printed
+    validations:
+      required: true

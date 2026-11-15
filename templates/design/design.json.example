@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "id": "household/example-name",
+  "name": "Example design name",
+  "build": {
+    "script": "cad/build.py",
+    "dependency_group": "cad-example-name",
+    "outputs": ["part-name.stl"]
+  }
+}

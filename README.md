@@ -6,6 +6,15 @@ A collection of printable designs, CAD source, print settings, and physical test
 
 *Featured prototype: [Gridfinity reciprocating saw blade holder with sliding lid](designs/gridfinity/reciprocating-saw-blade-holder/README.md). Rendered from the actual V4 STL meshes; physical print validation pending.*
 
+## New here?
+
+Start with our [Quickstart Guide](QUICKSTART.md)
+to print a design, suggest an improvement,
+or create a new design using AI.
+
+See [Contributing](CONTRIBUTING.md) for
+full contribution guidelines.
+
 ## Designs
 
 | Project | Category | Status | License |
