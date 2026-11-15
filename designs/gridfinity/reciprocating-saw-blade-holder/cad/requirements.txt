@@ -1,0 +1,7 @@
+# Python 3.11 is a reasonable starting point. Versions are not pinned or guaranteed across platforms.
+numpy
+cadquery
+vtk
+trimesh
+scipy
+scikit-image

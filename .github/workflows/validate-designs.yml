@@ -1,0 +1,69 @@
+name: Validate 3D designs
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Check STL geometry and Python source
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository and STL files (Git LFS)
+        uses: actions/checkout@v7
+        with:
+          lfs: true
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: scripts/requirements-ci.txt
+
+      - name: Install validation dependencies
+        run: python -m pip install -r scripts/requirements-ci.txt
+
+      - name: Validate build manifests
+        run: python scripts/build_designs.py --check
+
+      - name: Check Python syntax
+        run: python -m compileall -q scripts designs
+
+      - name: Test the validator
+        run: python -m unittest discover -s scripts/tests -v
+
+      - name: Validate all published STLs
+        run: python scripts/validate_stls.py --summary ci-results/stl-validation.md
+
+      - name: Run optional per-design mesh checks
+        run: python scripts/run_project_checks.py
+
+      - name: Show results on Actions summary
+        if: always()
+        shell: bash
+        run: |
+          if [ -f ci-results/stl-validation.md ]; then
+            cat ci-results/stl-validation.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'STL validation did not produce a report.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Save validation report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: stl-validation-report
+          path: ci-results/stl-validation.md
+          if-no-files-found: ignore
