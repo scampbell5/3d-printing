@@ -17,38 +17,68 @@ jobs:
   validate:
     name: Check STL geometry and Python source
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
-      - name: Check out repository and STL files (Git LFS)
+      - name: Check out repository and Git LFS STLs
         uses: actions/checkout@v7
         with:
           lfs: true
           persist-credentials: false
 
-      - name: Set up Python
-        uses: actions/setup-python@v7
+      - name: Install uv and enable dependency cache
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
         with:
-          python-version: '3.12'
-          cache: pip
-          cache-dependency-path: scripts/requirements-ci.txt
+          version: '0.10.0'
+          enable-cache: true
+          cache-dependency-glob: |
+            pyproject.toml
+            uv.lock
 
-      - name: Install validation dependencies
-        run: python -m pip install -r scripts/requirements-ci.txt
+      - name: Install pinned Python
+        run: uv python install
+
+      - name: Check lockfile or bootstrap first lock
+        id: lockfile
+        shell: bash
+        run: |
+          if [ -f uv.lock ]; then
+            uv lock --check
+            echo 'generated=false' >> "$GITHUB_OUTPUT"
+          else
+            uv lock
+            echo 'generated=true' >> "$GITHUB_OUTPUT"
+            echo '::warning::uv.lock is not committed. Download the generated-uv-lock artifact and commit uv.lock for reproducible builds.'
+          fi
+
+      - name: Offer generated lockfile as an artifact
+        if: steps.lockfile.outputs.generated == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: generated-uv-lock
+          path: uv.lock
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Install only the CI dependency group
+        run: uv sync --locked --no-default-groups --group ci
+
+      - name: Show mesh dependency versions
+        run: uv run --no-sync python -c "import numpy, scipy, trimesh; print('numpy:', numpy.__version__); print('scipy:', scipy.__version__); print('trimesh:', trimesh.__version__)"
 
       - name: Validate build manifests
-        run: python scripts/build_designs.py --check
+        run: uv run --no-sync python scripts/build_designs.py --check
 
       - name: Check Python syntax
-        run: python -m compileall -q scripts designs
+        run: uv run --no-sync python -m compileall -q scripts designs
 
-      - name: Test the validator
-        run: python -m unittest discover -s scripts/tests -v
+      - name: Run repository test suite
+        run: uv run --no-sync python -m unittest discover -s scripts/tests -v
 
       - name: Validate all published STLs
-        run: python scripts/validate_stls.py --summary ci-results/stl-validation.md
+        run: uv run --no-sync python scripts/validate_stls.py --summary ci-results/stl-validation.md
 
       - name: Run optional per-design mesh checks
-        run: python scripts/run_project_checks.py
+        run: uv run --no-sync python scripts/run_project_checks.py
 
       - name: Show results on Actions summary
         if: always()

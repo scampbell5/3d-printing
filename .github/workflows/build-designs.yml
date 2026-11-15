@@ -1,8 +1,6 @@
 name: Build designs (manual)
 
-# Rebuild any project that includes a designs/**/design.json manifest.
-# Use design=all to regenerate every registered project, or enter a slug
-# like gridfinity/reciprocating-saw-blade-holder to regenerate one.
+# Build any design declaring a designs/**/design.json manifest.
 on:
   workflow_dispatch:
     inputs:
@@ -25,29 +23,56 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
-      - name: Check out source and Git LFS geometry
+      - name: Check out repository and Git LFS geometry
         uses: actions/checkout@v7
         with:
           lfs: true
           persist-credentials: false
 
-      - name: Set up Python
-        uses: actions/setup-python@v7
+      - name: Install uv and enable dependency cache
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
         with:
-          python-version: '3.12'
-          cache: pip
-          cache-dependency-path: scripts/requirements-ci.txt
+          version: '0.10.0'
+          enable-cache: true
+          cache-dependency-glob: |
+            pyproject.toml
+            uv.lock
+
+      - name: Install pinned Python
+        run: uv python install
+
+      - name: Check lockfile or bootstrap first lock
+        id: lockfile
+        shell: bash
+        run: |
+          if [ -f uv.lock ]; then
+            uv lock --check
+            echo 'generated=false' >> "$GITHUB_OUTPUT"
+          else
+            uv lock
+            echo 'generated=true' >> "$GITHUB_OUTPUT"
+            echo '::warning::uv.lock is not committed. Download the generated-uv-lock artifact and commit uv.lock for reproducible builds.'
+          fi
+
+      - name: Offer generated lockfile as an artifact
+        if: steps.lockfile.outputs.generated == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: generated-uv-lock
+          path: uv.lock
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Install mesh validator dependencies
-        run: python -m pip install -r scripts/requirements-ci.txt
+        run: uv sync --locked --no-default-groups --group ci
 
-      - name: Verify all design manifests
-        run: python scripts/build_designs.py --check
+      - name: Verify design manifests
+        run: uv run --no-sync python scripts/build_designs.py --check
 
       - name: Rebuild and validate selected designs
         env:
           BUILD_SELECTION: ${{ inputs.design }}
-        run: python scripts/build_designs.py --design "$BUILD_SELECTION" --artifact-root dist/builds
+        run: uv run --no-sync python scripts/build_designs.py --design "$BUILD_SELECTION" --artifact-root dist/builds
 
       - name: Add design build report to Actions summary
         if: always()
