@@ -63,9 +63,10 @@ GitHub Actions runs the included mesh checks on commits and pull requests; see t
 `references/original_oly_storage_v6b.stl` contains the original input supplied for the remix and is included under the original model's Creative Commons terms, with attribution. The build script produces `stl/holder.stl`, `stl/sliding-lid-assembled.stl`, and `stl/sliding-lid-print-face-down.stl` and requires substantial RAM for voxel mesh reconstruction.
 
 ```bash
-python -m pip install -r cad/requirements.txt
-python cad/build_v4.py
-python scripts/check_meshes.py
+# From the repository root; requires a committed/generated uv.lock:
+uv run --locked --no-default-groups --group ci python scripts/build_designs.py --design gridfinity/reciprocating-saw-blade-holder
+# Validate committed outputs:
+uv run --locked --no-default-groups --group ci python scripts/run_project_checks.py
 ```
 
 The generic [Build designs workflow](../../../BUILDING_DESIGNS.md) discovers this project through `design.json`. Generated GitHub artifacts are separate from committed STLs. The checked-in STLs are the version prepared during the V4 design session. Rebuilding with different dependency versions may produce slightly different triangulation or dimensions. A slicer preview and real test print are still required.

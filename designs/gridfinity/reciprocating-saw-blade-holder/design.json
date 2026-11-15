@@ -4,11 +4,11 @@
   "name": "Gridfinity reciprocating saw blade holder (V4)",
   "build": {
     "script": "cad/build_v4.py",
-    "requirements": "cad/requirements.txt",
     "outputs": [
       "holder.stl",
       "sliding-lid-assembled.stl",
       "sliding-lid-print-face-down.stl"
-    ]
+    ],
+    "dependency_group": "cad-saw-blade-holder"
   }
 }

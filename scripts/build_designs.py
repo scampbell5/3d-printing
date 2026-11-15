@@ -13,6 +13,8 @@ import argparse
 from dataclasses import dataclass
 import json
 import os
+import re
+import tomllib
 from pathlib import Path
 import subprocess
 import sys
@@ -31,7 +33,7 @@ class Project:
     slug: str
     root: Path
     source: Path
-    requirements: Path | None
+    dependency_group: str | None
     outputs: tuple[str, ...]
     name: str
 
@@ -73,8 +75,19 @@ def parse_manifest(manifest: Path, repository: Path = REPO_ROOT) -> Project:
     source = confined_file(root, build.get('script'), 'build.script')
     if source.suffix != '.py':
         raise ManifestError(f'{slug}: build.script must be a Python file')
-    requirements = build.get('requirements')
-    deps = confined_file(root, requirements, 'build.requirements') if requirements is not None else None
+    if 'requirements' in build:
+        raise ManifestError(f'{slug}: build.requirements is obsolete; use build.dependency_group')
+    group = build.get('dependency_group')
+    if group is not None:
+        if not isinstance(group, str) or not re.fullmatch(r'[a-z][a-z0-9-]*', group):
+            raise ManifestError(f'{slug}: dependency_group must be a named uv dependency group')
+        project_file = repository / 'pyproject.toml'
+        try:
+            project_config = tomllib.loads(project_file.read_text(encoding='utf-8'))
+        except (OSError, ValueError) as exc:
+            raise ManifestError(f'{slug}: cannot read repository pyproject.toml: {exc}') from exc
+        if group not in project_config.get('dependency-groups', {}):
+            raise ManifestError(f'{slug}: uv dependency group {group!r} is not defined in pyproject.toml')
     declared = build.get('outputs')
     if not isinstance(declared, list) or not declared:
         raise ManifestError(f'{slug}: build.outputs must be a nonempty list')
@@ -88,7 +101,7 @@ def parse_manifest(manifest: Path, repository: Path = REPO_ROOT) -> Project:
         outputs.append(output)
     if len(outputs) != len(set(outputs)):
         raise ManifestError(f'{slug}: build.outputs contains duplicate names')
-    return Project(slug, root, source, deps, tuple(outputs), data['name'])
+    return Project(slug, root, source, group, tuple(outputs), data['name'])
 
 
 def discover_projects(repository: Path = REPO_ROOT) -> list[Project]:
@@ -127,6 +140,17 @@ def check_generated(project: Project, out_dir: Path) -> tuple[bool, list[str]]:
     return all(row.startswith('PASS') for row in errors), errors
 
 
+def command_for_project(project: Project, *, use_uv: bool = True) -> list[str]:
+    """Run the builder with locked CI and design-specific dependency groups."""
+    if not use_uv:
+        return [sys.executable, str(project.source)]
+    cmd = ['uv', 'run', '--project', str(REPO_ROOT), '--locked',
+           '--no-default-groups', '--group', 'ci']
+    if project.dependency_group:
+        cmd.extend(['--group', project.dependency_group])
+    return cmd + ['python', str(project.source)]
+
+
 def run_builds(projects: Sequence[Project], artifact_root: Path, *, install: bool = True,
                dry_run: bool = False) -> bool:
     report = [
@@ -139,7 +163,7 @@ def run_builds(projects: Sequence[Project], artifact_root: Path, *, install: boo
     try:
         for project in projects:
             out_dir = artifact_root / project.slug
-            cmd = [sys.executable, str(project.source)]
+            cmd = command_for_project(project, use_uv=install)
             print(f'\n=== {project.slug} ===', flush=True)
             report.extend((f'## {project.name}', '', f'Project: `{project.slug}`', ''))
             if dry_run:
@@ -148,9 +172,6 @@ def run_builds(projects: Sequence[Project], artifact_root: Path, *, install: boo
                 report.append('DRY RUN — no STL generated.\n')
                 continue
             try:
-                if install and project.requirements is not None:
-                    subprocess.run([sys.executable, '-m', 'pip', 'install', '-r', str(project.requirements)],
-                                   check=True, cwd=project.root)
                 out_dir.mkdir(parents=True, exist_ok=True)
                 with tempfile.TemporaryDirectory(prefix='cad-build-work-') as work:
                     env = dict(os.environ,
@@ -180,7 +201,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     group.add_argument('--check', action='store_true', help='Validate every design manifest without building')
     ap.add_argument('--design', default='all', help='Build all designs, or one designs/relative/path')
     ap.add_argument('--artifact-root', type=Path, default=REPO_ROOT / 'dist' / 'builds')
-    ap.add_argument('--no-install', action='store_true', help='Skip installing project CAD dependencies')
+    ap.add_argument('--no-install', action='store_true', help='Run with the current Python instead of uv locked dependency groups')
     ap.add_argument('--dry-run', action='store_true', help='Print selected builds without executing')
     args = ap.parse_args(argv)
     try:

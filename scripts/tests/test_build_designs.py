@@ -6,7 +6,7 @@ import unittest
 
 from scripts.build_designs import (
     ManifestError, discover_projects, parse_manifest,
-    run_builds, select_projects,
+    run_builds, select_projects, command_for_project,
 )
 
 
@@ -60,6 +60,42 @@ class BuilderTests(unittest.TestCase):
             (directory / 'design.json').write_text(json.dumps(data))
             with self.assertRaises(ManifestError):
                 discover_projects(root)
+
+    def test_uv_dependency_group_is_validated(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            directory = self.make_project(root)
+            data = json.loads((directory / 'design.json').read_text())
+            data['build']['dependency_group'] = 'cad-my-project'
+            (directory / 'design.json').write_text(json.dumps(data))
+            (root / 'pyproject.toml').write_text('[dependency-groups]\ncad-my-project = ["trimesh"]\n')
+            project = parse_manifest(directory / 'design.json', root)
+            self.assertEqual(project.dependency_group, 'cad-my-project')
+            self.assertIn('--group', command_for_project(project))
+            self.assertIn('cad-my-project', command_for_project(project))
+            self.assertIn('--locked', command_for_project(project))
+            self.assertNotIn('pip', command_for_project(project))
+
+    def test_unknown_uv_dependency_group_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            directory = self.make_project(root)
+            data = json.loads((directory / 'design.json').read_text())
+            data['build']['dependency_group'] = 'missing'
+            (directory / 'design.json').write_text(json.dumps(data))
+            (root / 'pyproject.toml').write_text('[dependency-groups]\nci = ["trimesh"]\n')
+            with self.assertRaises(ManifestError):
+                parse_manifest(directory / 'design.json', root)
+
+    def test_legacy_requirements_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            directory = self.make_project(root)
+            data = json.loads((directory / 'design.json').read_text())
+            data['build']['requirements'] = 'cad/requirements.txt'
+            (directory / 'design.json').write_text(json.dumps(data))
+            with self.assertRaisesRegex(ManifestError, 'obsolete'):
+                parse_manifest(directory / 'design.json', root)
 
     def test_build_writes_only_to_artifact_directory(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -1,7 +1,7 @@
 # Before publishing to public GitHub
 
-- [ ] Visit the original [Printables design](https://www.printables.com/model/358300-gridfinity-reciprocating-saw-aka-sawzall-blade-sto) and verify exact license **version** and creator notices.
-- [ ] Confirm the derivative license in `LICENSE.md` is compatible with the upstream license.
+- [x] Confirm original [Printables design](https://www.printables.com/model/358300-gridfinity-reciprocating-saw-aka-sawzall-blade-sto) is CC BY-NC-SA **4.0 International** (user verified the linked license).
+- [x] Confirm the remix in `LICENSE.md` uses the same CC BY-NC-SA 4.0 license.
 - [x] Include original creator name, link, and changed-design notes in `ATTRIBUTION.md`.
 - [x] No repository-wide license applied to unrelated future designs.
 - [ ] Confirm you're publishing this remix **noncommercially**; selling models/prints or otherwise commercializing it would need extra permission.

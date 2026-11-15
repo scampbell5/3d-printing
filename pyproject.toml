@@ -1,0 +1,26 @@
+[project]
+name = "3d-printing-designs"
+version = "0.1.0"
+description = "Python CAD build scripts and STL validation for a multi-design 3D printing repository"
+requires-python = ">=3.12,<3.13"
+dependencies = []
+
+[dependency-groups]
+# Lightweight checks run for every push / pull request.
+ci = [
+  "numpy==2.3.5",
+  "scipy==1.17.0", # Required for Trimesh connected-component / graph checks
+  "trimesh==4.11.1",
+]
+# Opt-in packages needed only when building this particular CAD design.
+# Future projects may register their own dependency groups in this file.
+cad-saw-blade-holder = [
+  "cadquery>=2.5,<3",
+  "vtk>=9.3,<10",
+  "scikit-image>=0.25,<0.27",
+]
+
+[tool.uv]
+package = false
+# Never install heavy CAD groups during a routine validation by default.
+default-groups = []

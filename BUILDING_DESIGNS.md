@@ -1,43 +1,64 @@
-# Rebuilding CAD designs on GitHub Actions
+# Building designs with uv
 
-The generic [Build designs (manual)](.github/workflows/build-designs.yml) workflow
-regenerates selected models from their CAD scripts. It is independent of the
-[automatic STL validation](.github/workflows/validate-designs.yml) workflow.
+The repository-wide **Validate 3D designs** workflow runs on pushes and pull requests.
+The generic **Build designs (manual)** workflow reconstructs CAD designs on demand;
+large or memory-intensive builds are not part of routine validation.
 
-## Run a rebuild
+## First-time setup
 
-1. Open your GitHub repository → **Actions** → **Build designs (manual)**.
-2. Click **Run workflow**.
-3. For `design`, enter **`all`** to rebuild all registered projects, or the
-   project ID (currently **`gridfinity/reciprocating-saw-blade-holder`**).
-4. When the run finishes, download the **`rebuilt-designs-...`** artifact from
-   the run. It contains only generated STLs and a `BUILD-REPORT.md` file.
+Install [uv](https://docs.astral.sh/uv/), then in the repository root run:
 
-The build runs **only on manual request**, because some CAD reconstructions
-are computationally expensive. A normal push or pull request runs the fast,
-repo-wide STL checks instead. Builds do not modify or commit source files or
-STLs in GitHub; outputs live in isolated `dist/builds/` directories in CI.
-
-**Limitations:** mesh checks verify watertightness, shell connectivity, winding,
-and positive volume; they cannot certify printability, Gridfinity fit, support
-requirements, or the physical sliding-lock mechanism. The current V4 CAD
-rebuild has not yet been executed on a GitHub-hosted runner; it may need RAM,
-package version, or timeout adjustments.
-
-## Register a new design
-
-Place a `design.json` alongside that design's README:
-
-```text
-designs/household/my-project/
-├── design.json
-├── cad/
-│   ├── build.py
-│   └── requirements.txt
-└── stl/
+```bash
+uv python install
+uv lock                 # Generate uv.lock if it is not already committed
+uv sync --locked --no-default-groups --group ci
+uv run --no-sync python -m unittest discover -s scripts/tests -v
+uv run --no-sync python scripts/validate_stls.py
 ```
 
-The manifest format is:
+**Commit `uv.lock`** along with `pyproject.toml`. The lock includes dependencies
+for both CI and all registered CAD build groups, even though the CI environment
+installs only `ci` during normal validation. When dependencies change, run
+`uv lock` and commit the updated lockfile. The GitHub Actions workflows check
+an existing lockfile with `uv lock --check` and refuse a stale lock. If a
+lockfile is absent, Actions temporarily resolves one and uploads it as a
+`generated-uv-lock` artifact so you can commit it; until then those runs
+are **not reproducible**.
+
+## Rebuild a design
+
+In GitHub: **Actions → Build designs (manual) → Run workflow** and enter `all`
+or a project ID, currently `gridfinity/reciprocating-saw-blade-holder`.
+Download the `rebuilt-designs-...` artifact, containing generated STLs and
+`BUILD-REPORT.md`. This does **not** commit or overwrite existing STL files.
+
+Or run locally:
+
+```bash
+uv run --locked --no-default-groups --group ci python scripts/build_designs.py --list
+uv run --locked --no-default-groups --group ci python scripts/build_designs.py --check
+uv run --locked --no-default-groups --group ci python scripts/build_designs.py --design all --dry-run
+uv run --locked --no-default-groups --group ci python scripts/build_designs.py --design gridfinity/reciprocating-saw-blade-holder
+```
+
+The builder automatically uses `uv run --locked` with the project's named
+CAD dependency group. It isolates output in `dist/builds/<project-id>/` and
+validates each required STL before reporting success. Group-specific packages
+are *not* installed during the regular validation job.
+
+## Register another design
+
+Add the dependencies for your new CAD script to a **unique dependency group**
+in the root `pyproject.toml`:
+
+```toml
+[dependency-groups]
+# ... existing groups ...
+cad-my-project = ["cadquery>=2.5,<3"]
+```
+
+Then run `uv lock` and commit the updated lockfile. Define a manifest at
+`designs/household/my-project/design.json`:
 
 ```json
 {
@@ -46,22 +67,23 @@ The manifest format is:
   "name": "My project",
   "build": {
     "script": "cad/build.py",
-    "requirements": "cad/requirements.txt",
+    "dependency_group": "cad-my-project",
     "outputs": ["holder.stl", "lid.stl"]
   }
 }
 ```
 
-`id` must match its path below `designs/`. `requirements` is optional.
-The list of `outputs` is required and is checked against actual generated STLs.
+`id` must equal the directory path relative to `designs/`. The dependency group
+is optional for builds that need only the `ci` packages. The manifest checker
+rejects unknown dependency groups, path escapes, and missing Python scripts.
+There are no per-design `requirements.txt` files.
 
-The builder invokes your Python script from the design directory. Read these
-environment variables in the CAD script so CI can preserve tracked files:
+Every CAD script should write generated files to the exact names in `outputs`,
+respecting the following environment variables:
 
 ```python
 import os
 from pathlib import Path
-
 project_root = Path(__file__).resolve().parents[1]
 output_dir = Path(os.environ.get('DESIGN_BUILD_OUTPUT_DIR', project_root / 'stl'))
 work_dir = Path(os.environ.get('DESIGN_BUILD_WORK_DIR', project_root / 'cad' / 'build'))
@@ -69,28 +91,13 @@ output_dir.mkdir(parents=True, exist_ok=True)
 work_dir.mkdir(parents=True, exist_ok=True)
 ```
 
-Your script should write precisely the STL names declared under `outputs`.
-The workflow installs the design's Python requirements, runs its script,
-checks the generated STLs, and uploads them as artifacts.
+## What gets tested
 
-## Optional project-specific validation
+The mesh validator checks watertightness, connected shells, winding, positive
+volume, and plausible extents. It does not prove support-free printing, correct
+baseplate tolerances, or locking strength. An optional `scripts/check_meshes.py`
+inside each design is discovered automatically and runs against committed STLs.
 
-You can place an additional `scripts/check_meshes.py` inside any design
-folder. Automatic CI discovers and runs all of them without modifying a
-workflow. These tests check committed files; the generic builder separately
-validates every generated STL named in `design.json`.
-
-## Local commands
-
-```bash
-python -m pip install -r scripts/requirements-ci.txt
-python scripts/build_designs.py --list
-python scripts/build_designs.py --check
-python scripts/build_designs.py --design all --dry-run
-python scripts/build_designs.py --design gridfinity/reciprocating-saw-blade-holder
-python -m unittest discover -s scripts/tests -v
-```
-
-Rebuilds run CAD code and install its dependencies. Only run builders from
-projects you trust. Avoid adding untrusted or third-party build scripts to a
-public repository without review.
+CAD rebuilds run executable Python from the repository. Only run scripts from
+sources you trust. The existing V4 reconstruction is resource intensive and
+has not been run on a GitHub-hosted runner yet.
